@@ -1,20 +1,66 @@
-# Reproducible Research: Peer Assessment 1
+Reproducible Research Peer-Review Excercise 1 
+========================================================
 
+Excercise submitted by Rajeev Vij
+Thanks for reviewing
 
-## Loading and preprocessing the data
+## Step 1 Read data file and produce summary information
 
+```{r}
 
+activity <- read.csv("activity.csv", sep=",", header=TRUE, stringsAsFactors=FALSE)
+head(activity)
+summary(activity)
+```
 
-## What is mean total number of steps taken per day?
+## Step 1 Draw chart for total steps per day and avg steps per interval excluding missing data
 
+```{r}
+library(sqldf)
 
+ex1 <- sqldf("select date, sum(steps) as steps_per_day from activity where steps <> 'NA' group by date")
 
-## What is the average daily activity pattern?
+library(ggplot2)
 
+qplot(steps_per_day, data=ex1, geom="histogram", binwidth=1000)
 
+ex2 <- sqldf("select interval, avg(steps) as avg_steps from activity where steps <> 'NA' group by interval")
 
-## Imputing missing values
+maxval <- ex2[ex2$avg_steps == max(ex2$avg_steps), ]
 
+ggplot(ex2, aes(ex2$interval, ex2$avg_steps)) + geom_line() + 
+  geom_vline(xintercept=maxval$interval) +
+  annotate("text", x = maxval$interval:maxval$interval, y = 0, label = as.character(maxval$interval))
+````
 
+## Step 3 Impute missing data and draw total steps per interval and produce summary
+```{r}
+activity_nona <- activity
+sum(is.na(activity_nona$steps))
 
-## Are there differences in activity patterns between weekdays and weekends?
+naindx <- which(is.na(activity_nona$steps))
+
+for (i in naindx){
+  activity_nona$steps[i] <- ex2[ex2$interval == activity_nona$interval[i],"avg_steps" ]
+}
+
+ex11 <- sqldf("select date, sum(steps) as steps_per_day from activity_nona where steps <> 'NA' group by date")
+
+qplot(steps_per_day, data=ex11, geom="histogram", binwidth=1000)
+
+summary(activity_nona)
+```
+
+## Step 4: Add a factor variable daytype and produce facetd plot of avg_steps per interval 
+```{r}
+activity_nona$daytype <- as.factor(sapply(as.Date(activity_nona$date), function(d) {if(weekdays(d) %in% c("Saturday", "Sunday")) "Weekend" else "Weekday"}))
+
+table(activity_nona$daytype)
+
+ex3 <- sqldf("select daytype, interval, avg(steps) as avg_steps from activity_nona group by daytype, interval")
+
+p <- ggplot(ex3, aes(interval,avg_steps)) + geom_line()
+p + facet_grid(daytype ~ .)
+
+```
+
